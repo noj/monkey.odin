@@ -7,6 +7,7 @@ Eof :: struct {}
 
 Illegal :: struct {
     val: u8,
+    loc: Loc,
 }
 
 SimpleVal :: enum u8 {
@@ -83,11 +84,19 @@ Token :: union {
     Eof,
 }
 
+Loc :: struct {
+    line: int,
+    col: int
+}
+
 Lexer :: struct {
     input: string,
     pos: int,
     read_pos: int,
     ch: u8,
+
+    // For error reporting:
+    loc: Loc,
 }
 
 new_lexer :: proc(text: string) -> Lexer {
@@ -95,7 +104,11 @@ new_lexer :: proc(text: string) -> Lexer {
         input = text,
         pos = 0,
         read_pos = 0,
-        ch =  0,
+        ch = 0,
+        loc = {
+            line = 1,
+            col = 1,
+        }
     }
 
     read_char(&lexer)
@@ -128,12 +141,20 @@ skip_whitespace :: proc(lex: ^Lexer) {
     for {
         switch lex.ch {
         case ' ':
+            lex.loc.col += 1
             fallthrough
+
         case '\t':
+            lex.loc.col += 1
             fallthrough
+
         case '\n':
             fallthrough
+
         case '\r':
+            lex.loc.col = 1
+            lex.loc.line += 1
+
             read_char(lex)
 
         case:
@@ -248,7 +269,7 @@ next_token :: proc(lex: ^Lexer) -> Token {
             lit := read_number(lex)
             return Int { literal = lit }
         } else {
-            tok = Illegal { val = lex.ch }
+            tok = Illegal { val = lex.ch, loc = lex.loc }
         }
     }
 
@@ -314,7 +335,7 @@ token_to_string :: proc(tok: Token) -> string {
         fmt.sbprintf(&buf, "ident \"%s\"", t.literal)
 
     case Illegal:
-        fmt.sbprintf(&buf, "illegal \"%c\"", t.val)
+        fmt.sbprintf(&buf, "%d:%d: illegal \"%c\"", t.loc.line, t.loc.col, t.val)
 
     case Eof:
         return "eof"
