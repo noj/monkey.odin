@@ -2,71 +2,88 @@ package lexer
 
 import "core:fmt"
 import "core:strings"
+import "core:bytes"
 
+// Location in source
+Loc :: struct {
+    line: int,
+    col: int
+}
+
+// Token structs
 Eof :: struct {}
 
 Illegal :: struct {
-    val: u8,
+    val: byte,
     loc: Loc,
 }
 
-SimpleVal :: enum u8 {
-    ASSIGN = '=',
-    BANG = '!',
-
-    PLUS = '+',
-    MINUS = '-',
-    ASTERISK = '*',
-    SLASH = '/',
-    LT = '<',
-    GT = '>',
-
-    // Delimiters
-    COMMA = ',',
-    SEMICOLON = ';',
-    COLON = ':',
-    LPAREN = '(',
-    RPAREN = ')',
-    LBRACKET = '[',
-    RBRACKET = ']',
-    LBRACE = '{',
-    RBRACE = '}',
-}
 
 Simple :: struct {
-    val: SimpleVal
+    val: enum u8 {
+        ASSIGN = '=',
+        BANG = '!',
+
+        PLUS = '+',
+        MINUS = '-',
+        ASTERISK = '*',
+        SLASH = '/',
+        LT = '<',
+        GT = '>',
+
+        // Delimiters
+        COMMA = ',',
+        SEMICOLON = ';',
+        COLON = ':',
+        LPAREN = '(',
+        RPAREN = ')',
+        LBRACKET = '[',
+        RBRACKET = ']',
+        LBRACE = '{',
+        RBRACE = '}',
+    },
+    loc: Loc,
 }
 
 String :: struct {
-    literal: string,
+    literal: []byte,
+    loc: Loc,
 }
 
 Int :: struct {
     literal: i64,
+    loc: Loc,
 }
 
-Eq :: struct {}
+Eq :: struct {
+    loc: Loc,
+}
 
-NotEq :: struct {}
+NotEq :: struct {
+    loc: Loc,
+}
 
-Let :: struct {}
+Let :: struct {
+    log: Loc,
+}
 
 Ident :: struct {
-    literal: string,
+    literal: []byte,
+    loc: Loc,
 }
 
-KeywordName :: enum u8 {
-    Fun,
-    Let,
-    True,
-    False,
-    If,
-    Else,
-    Return,
-}
 
 Keyword :: struct {
-    name: KeywordName
+    name: enum u8 {
+        Fun,
+        Let,
+        True,
+        False,
+        If,
+        Else,
+        Return,
+    },
+    loc: Loc,
 }
 
 Token :: union {
@@ -84,18 +101,12 @@ Token :: union {
     Eof,
 }
 
-Loc :: struct {
-    line: int,
-    col: int
-}
-
+// Lexer
 Lexer :: struct {
     input: string,
     pos: int,
     read_pos: int,
     ch: u8,
-
-    // For error reporting:
     loc: Loc,
 }
 
@@ -142,15 +153,14 @@ skip_whitespace :: proc(lex: ^Lexer) {
         switch lex.ch {
         case ' ':
             lex.loc.col += 1
-            fallthrough
+            read_char(lex)
 
         case '\t':
             lex.loc.col += 1
-            fallthrough
+            read_char(lex)
 
         case '\n':
             fallthrough
-
         case '\r':
             lex.loc.col = 1
             lex.loc.line += 1
@@ -178,6 +188,7 @@ read_number :: proc(lex: ^Lexer) -> i64 {
     for is_digit(lex.ch) {
         lit = 10 * lit + i64(lex.ch - u8('0'))
         read_char(lex)
+        lex.loc.col += 1
     }
 
     return lit
@@ -186,90 +197,93 @@ read_number :: proc(lex: ^Lexer) -> i64 {
 next_token :: proc(lex: ^Lexer) -> Token {
     skip_whitespace(lex)
 
+    loc := lex.loc
+
     tok: Token
     switch lex.ch {
     case '"':
         tok = String{
-            literal = read_string(lex)
+            literal = read_string(lex),
+            loc = lex.loc,
         }
 
     case '=':
         if peek_char(lex) == '=' {
             read_char(lex)
-            tok = Eq {}
+            tok = Eq { loc = lex.loc }
         } else {
-            tok = Simple { val = SimpleVal.ASSIGN }
+            tok = Simple { val = .ASSIGN, loc = loc }
         }
 
     case '!':
         if peek_char(lex) == '=' {
             read_char(lex)
-            tok = NotEq {}
+            tok = NotEq { loc = loc }
         } else {
-            tok = Simple { val = SimpleVal.BANG }
+            tok = Simple { val = .BANG, loc = loc }
         }
 
     case '(':
-        tok = Simple { val = SimpleVal.LPAREN }
+        tok = Simple { val = .LPAREN, loc = loc }
     case ')':
-        tok = Simple { val = SimpleVal.RPAREN }
+        tok = Simple { val = .RPAREN, loc = loc }
     case '[':
-        tok = Simple { val = SimpleVal.LBRACKET }
+        tok = Simple { val = .LBRACKET, loc = loc }
     case ']':
-        tok = Simple { val = SimpleVal.RBRACKET }
+        tok = Simple { val = .RBRACKET, loc = loc  }
     case '{':
-        tok = Simple { val = SimpleVal.LBRACE }
+        tok = Simple { val = .LBRACE, loc = loc }
     case '}':
-        tok = Simple { val = SimpleVal.RBRACE }
+        tok = Simple { val = .RBRACE, loc = loc  }
 
     case ':':
-        tok = Simple { val = SimpleVal.COLON }
+        tok = Simple { val = .COLON, loc = loc }
     case '/':
-        tok = Simple { val = SimpleVal.SLASH }
+        tok = Simple { val = .SLASH, loc = loc }
     case '*':
-        tok = Simple { val = SimpleVal.ASTERISK }
+        tok = Simple { val = .ASTERISK, loc = loc }
     case '<':
-        tok = Simple { val = SimpleVal.LT }
+        tok = Simple { val = .LT, loc = loc }
     case '>':
-        tok = Simple { val = SimpleVal.GT }
+        tok = Simple { val = .GT, loc = loc }
     case ';':
-        tok = Simple { val = SimpleVal.SEMICOLON }
+        tok = Simple { val = .SEMICOLON, loc = loc }
     case ',':
-        tok = Simple { val = SimpleVal.COMMA }
+        tok = Simple { val = .COMMA, loc = loc }
     case '+':
-        tok = Simple { val = SimpleVal.PLUS }
+        tok = Simple { val = .PLUS, loc = loc }
     case '-':
-        tok = Simple { val = SimpleVal.MINUS }
+        tok = Simple { val = .MINUS, loc = loc }
 
     case 0:
-        tok = Eof {}
+        tok = Eof { }
 
     case:
         if is_letter(lex.ch) {
             lit := read_identifier(lex)
-            switch lit {
-            case "fn":
-                return Keyword { name = KeywordName.Fun }
-            case "let":
-                return Keyword { name = KeywordName.Let }
-            case "true":
-                return Keyword { name = KeywordName.True }
-            case "false":
-                return Keyword { name = KeywordName.False }
-            case "if":
-                return Keyword { name = KeywordName.If }
-            case "else":
-                return Keyword { name = KeywordName.Else }
-            case "return":
-                return Keyword { name = KeywordName.Return }
+            switch {
+            case bytes.compare(lit, []byte{'f', 'n'}) == 0:
+                return Keyword { name = .Fun, loc = loc }
+            case bytes.compare(lit, []byte{'l', 'e', 't'}) == 0:
+                return Keyword { name = .Let, loc = loc }
+            case bytes.compare(lit, []byte{'t', 'r', 'u', 'e'}) == 0:
+                return Keyword { name = .True, loc = loc }
+            case bytes.compare(lit, []byte{'f', 'a', 'l', 's', 'e'}) == 0:
+                return Keyword { name = .False, loc = loc }
+            case bytes.compare(lit, []byte{'i', 'f'}) == 0:
+                return Keyword { name = .If, loc = loc }
+            case bytes.compare(lit, []byte{'e', 'l', 's', 'e'}) == 0:
+                return Keyword { name = .Else, loc = loc }
+            case bytes.compare(lit, []byte{'r', 'e', 't', 'u', 'r', 'n'}) == 0:
+                return Keyword { name = .Return, loc = loc }
             case:
-                tok = Ident { literal = lit }
+                tok = Ident { literal = lit, loc = loc }
             }
         } else if is_digit(lex.ch) {
             lit := read_number(lex)
-            return Int { literal = lit }
+            return Int { literal = lit, loc = loc }
         } else {
-            tok = Illegal { val = lex.ch, loc = lex.loc }
+            tok = Illegal { val = lex.ch, loc = loc }
         }
     }
 
@@ -278,21 +292,17 @@ next_token :: proc(lex: ^Lexer) -> Token {
     return tok
 }
 
-read_identifier :: proc(lex: ^Lexer) -> string {
-    buf: strings.Builder
-
+read_identifier :: proc(lex: ^Lexer) -> []byte {
     pos := lex.pos
     for is_letter(lex.ch) {
-        strings.write_byte(&buf, lex.ch)
+        lex.loc.col += 1
         read_char(lex)
     }
 
-    return strings.to_string(buf)
+    return transmute([]byte)lex.input[pos:lex.pos]
 }
 
-read_string :: proc(lex: ^Lexer) -> string {
-    buf: strings.Builder
-
+read_string :: proc(lex: ^Lexer) -> []byte {
     pos := lex.pos + 1
     for {
         read_char(lex)
@@ -301,44 +311,42 @@ read_string :: proc(lex: ^Lexer) -> string {
             break
         }
 
-        strings.write_byte(&buf, lex.ch)
+        lex.loc.col += 1
     }
 
-    return strings.to_string(buf)
+    return transmute([]byte)lex.input[pos:lex.pos]
 }
 
-// Overloaded in to_string
-@(private)
 token_to_string :: proc(tok: Token) -> string {
     buf: strings.Builder
 
     switch t in tok {
     case Simple:
-        fmt.sbprintf(&buf, "`%c`", u8(t.val))
+        fmt.sbprintf(&buf, "%d:%d: `%c`", t.loc.line, t.loc.col, u8(t.val))
 
     case String:
-        fmt.sbprintf(&buf, "str \"%s\"", t.literal)
+        fmt.sbprintf(&buf, "%d:%d: str \"%s\"", t.loc.line, t.loc.col, t.literal)
 
     case Int:
-        fmt.sbprintf(&buf, "int \"%d\"", t.literal)
+        fmt.sbprintf(&buf, "%d:%d: int \"%d\"", t.loc.line, t.loc.col, t.literal)
 
     case Eq:
-        return "eq"
+        fmt.sbprintf(&buf, "%d:%d: eq", t.loc.line, t.loc.col)
 
     case NotEq:
-        return "eq"
+        fmt.sbprintf(&buf, "%d:%d: noteq", t.loc.line, t.loc.col)
 
     case Keyword:
-        return to_string(t)
+        fmt.sbprintf(&buf, "%d:%d: %s", t.loc.line, t.loc.col, to_string(t))
 
     case Ident:
-        fmt.sbprintf(&buf, "ident \"%s\"", t.literal)
+        fmt.sbprintf(&buf, "%d:%d: ident \"%s\"", t.loc.line, t.loc.col, t.literal)
 
     case Illegal:
         fmt.sbprintf(&buf, "%d:%d: illegal \"%c\"", t.loc.line, t.loc.col, t.val)
 
     case Eof:
-        return "eof"
+        fmt.sbprintf(&buf, "eof")
     }
 
     return strings.to_string(buf)
@@ -347,25 +355,25 @@ token_to_string :: proc(tok: Token) -> string {
 @(private)
 keyword_to_string :: proc(k: Keyword) -> string {
     switch k.name {
-    case KeywordName.Fun:
+    case .Fun:
         return "fun"
 
-    case KeywordName.Let:
+    case .Let:
         return "let"
 
-    case KeywordName.True:
+    case .True:
         return "true"
 
-    case KeywordName.False:
+    case .False:
         return "false"
 
-    case KeywordName.If:
+    case .If:
         return "if"
 
-    case KeywordName.Else:
+    case .Else:
         return "else"
 
-    case KeywordName.Return:
+    case .Return:
         return "return"
     }
 
