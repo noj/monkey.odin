@@ -1,31 +1,31 @@
 package main
 
-import "core:fmt"
 import "core:bufio"
+import "core:fmt"
+import "core:mem"
 import "core:os"
 import "core:strings"
-import "core:mem"
 import "lexer"
 
 lex_debug :: proc(str: string) {
-    lex := lexer.new_lexer(str)
+	lex := lexer.new_lexer(str)
 
-    for {
-        tok := lexer.next_token(&lex)
-        str := lexer.token_to_string(tok)
-        defer delete(str)
+	for {
+		tok := lexer.next_token(&lex)
+		str := lexer.token_to_string(tok)
+		defer delete(str)
 
-        fmt.println(str)
+		fmt.println(str)
 
-        #partial switch t in tok {
-        case lexer.Eof:
-            return
-        }
-    }
+		#partial switch t in tok {
+		case lexer.Eof:
+			return
+		}
+	}
 }
 
 main :: proc() {
-    when ODIN_DEBUG {
+	when ODIN_DEBUG {
 		track: mem.Tracking_Allocator
 		mem.tracking_allocator_init(&track, context.allocator)
 		context.allocator = mem.tracking_allocator(&track)
@@ -47,25 +47,25 @@ main :: proc() {
 		}
 	}
 
-    r: bufio.Reader
+	r: bufio.Reader
 
-    for {
-        fmt.print(">> ")
+	for {
+		fmt.print(">> ")
 
-        // FIXME: >1024 character input
-        buffer: [1024]byte
-        n, err := os.read(os.stdin, buffer[:])
-        if err != nil {
-            fmt.eprintln("read error", err)
-            continue
-        }
+		// FIXME: >1024 character input
+		buffer: [1024]byte
+		n, err := os.read(os.stdin, buffer[:])
+		if err != nil {
+			fmt.eprintln("read error", err)
+			continue
+		}
 
-        // EOF
-        if n == 0 {
-            return
-        }
+		// EOF
+		if n == 0 {
+			return
+		}
 
-        line := strings.trim_space(string(buffer[:n]))
-        lex_debug(line)
-    }
+		line := strings.trim_space(string(buffer[:n]))
+		lex_debug(line)
+	}
 }
