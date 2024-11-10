@@ -202,15 +202,16 @@ next_token :: proc(lex: ^Lexer) -> Token {
     tok: Token
     switch lex.ch {
     case '"':
+        loc.col += 1
         tok = String{
             literal = read_string(lex),
-            loc = lex.loc,
+            loc = loc,
         }
 
     case '=':
         if peek_char(lex) == '=' {
             read_char(lex)
-            tok = Eq { loc = lex.loc }
+            tok = Eq { loc = loc }
         } else {
             tok = Simple { val = .ASSIGN, loc = loc }
         }
@@ -304,6 +305,8 @@ read_identifier :: proc(lex: ^Lexer) -> []byte {
 
 read_string :: proc(lex: ^Lexer) -> []byte {
     pos := lex.pos + 1
+    lex.loc.col += 1
+
     for {
         read_char(lex)
 
