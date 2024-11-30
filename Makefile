@@ -1,7 +1,9 @@
 .PHONY: run build
 
+FLAGS=-debug -sanitize:address
+
 run:
-	@odin run . -debug
+	@odin run monkey ${FLAGS}
 
 build:
-	@odin build . -debug
+	@odin build monkey ${FLAGS}
