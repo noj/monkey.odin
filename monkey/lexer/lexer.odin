@@ -1,6 +1,5 @@
 package lexer
 
-import "core:bytes"
 import "core:fmt"
 import "core:strings"
 
@@ -127,6 +126,7 @@ read_char :: proc(lex: ^Lexer) {
 		lex.ch = 0
 	} else {
 		lex.ch = lex.input[lex.read_pos]
+		lex.loc.col += 1
 	}
 
 	lex.pos = lex.read_pos
@@ -147,20 +147,19 @@ skip_whitespace :: proc(lex: ^Lexer) {
 	for {
 		switch lex.ch {
 		case ' ':
-			lex.loc.col += 1
 			read_char(lex)
 
 		case '\t':
-			lex.loc.col += 1
 			read_char(lex)
 
 		case '\n':
 			fallthrough
 		case '\r':
+			read_char(lex)
+
+			// Reset location:
 			lex.loc.col = 1
 			lex.loc.line += 1
-
-			read_char(lex)
 
 		case:
 			return
@@ -177,13 +176,10 @@ is_letter :: proc(ch: u8) -> bool {
 }
 
 read_number :: proc(lex: ^Lexer) -> i64 {
-	pos := lex.pos
-
 	lit: i64
 	for is_digit(lex.ch) {
 		lit = 10 * lit + i64(lex.ch - u8('0'))
 		read_char(lex)
-		lex.loc.col += 1
 	}
 
 	return lit
@@ -197,7 +193,6 @@ next_token :: proc(lex: ^Lexer) -> Token {
 	tok: Token
 	switch lex.ch {
 	case '"':
-		loc.col += 1
 		tok = String {
 			literal = read_string(lex),
 			loc     = loc,
@@ -312,20 +307,20 @@ next_token :: proc(lex: ^Lexer) -> Token {
 	case:
 		if is_letter(lex.ch) {
 			lit := read_identifier(lex)
-			switch {
-			case bytes.compare(lit, []byte{'f', 'n'}) == 0:
+			switch string(lit) {
+			case "fn":
 				return Keyword{name = .Fun, loc = loc}
-			case bytes.compare(lit, []byte{'l', 'e', 't'}) == 0:
+			case "let":
 				return Keyword{name = .Let, loc = loc}
-			case bytes.compare(lit, []byte{'t', 'r', 'u', 'e'}) == 0:
+			case "true":
 				return Keyword{name = .True, loc = loc}
-			case bytes.compare(lit, []byte{'f', 'a', 'l', 's', 'e'}) == 0:
+			case "false":
 				return Keyword{name = .False, loc = loc}
-			case bytes.compare(lit, []byte{'i', 'f'}) == 0:
+			case "if":
 				return Keyword{name = .If, loc = loc}
-			case bytes.compare(lit, []byte{'e', 'l', 's', 'e'}) == 0:
+			case "else":
 				return Keyword{name = .Else, loc = loc}
-			case bytes.compare(lit, []byte{'r', 'e', 't', 'u', 'r', 'n'}) == 0:
+			case "return":
 				return Keyword{name = .Return, loc = loc}
 			case:
 				tok = Ident {
@@ -352,7 +347,6 @@ next_token :: proc(lex: ^Lexer) -> Token {
 read_identifier :: proc(lex: ^Lexer) -> []byte {
 	pos := lex.pos
 	for is_letter(lex.ch) {
-		lex.loc.col += 1
 		read_char(lex)
 	}
 
@@ -361,7 +355,6 @@ read_identifier :: proc(lex: ^Lexer) -> []byte {
 
 read_string :: proc(lex: ^Lexer) -> []byte {
 	pos := lex.pos + 1
-	lex.loc.col += 1
 
 	for {
 		read_char(lex)
@@ -369,8 +362,6 @@ read_string :: proc(lex: ^Lexer) -> []byte {
 		if lex.ch == '"' || lex.ch == 0 {
 			break
 		}
-
-		lex.loc.col += 1
 	}
 
 	return transmute([]byte)lex.input[pos:lex.pos]

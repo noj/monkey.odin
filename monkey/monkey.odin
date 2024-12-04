@@ -1,6 +1,5 @@
 package main
 
-import "core:bufio"
 import "core:fmt"
 import "core:mem"
 import "core:os"
@@ -12,10 +11,10 @@ lex_debug :: proc(str: string) {
 
 	for {
 		tok := lexer.next_token(&lex)
-		str := lexer.token_to_string(tok)
-		defer delete(str)
+		tok_str := lexer.token_to_string(tok)
+		defer delete(tok_str)
 
-		fmt.println(str)
+		fmt.println(tok_str)
 
 		#partial switch t in tok {
 		case lexer.Eof:
@@ -46,8 +45,6 @@ main :: proc() {
 			mem.tracking_allocator_destroy(&track)
 		}
 	}
-
-	r: bufio.Reader
 
 	for {
 		fmt.print(">> ")
